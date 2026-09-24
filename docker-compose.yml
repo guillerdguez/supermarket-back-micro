@@ -1,19 +1,47 @@
-version: '3.8'
+x-healthcheck: &spring-healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 30
+  start_period: 40s
+
+x-platform-env: &platform-env
+  EUREKA_URL: http://eureka-server:8761/eureka
+  CONFIG_SERVER_URL: http://config-server:8888
+  ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+x-mysql-env: &mysql-env
+  MYSQL_HOST: mysql
+  MYSQL_PORT: 3306
+  MYSQL_USERNAME: root
+  MYSQL_PASSWORD: "${DB_PASSWORD:-123456}"
+
+x-platform-dependencies: &platform-dependencies
+  eureka-server:
+    condition: service_healthy
+  config-server:
+    condition: service_healthy
+  kafka:
+    condition: service_healthy
+  zipkin:
+    condition: service_started
+
 services:
   mysql:
     image: mysql:8.0
     container_name: supermarket-mysql
     environment:
       MYSQL_ROOT_PASSWORD: "${DB_PASSWORD:-123456}"
-      MYSQL_DATABASE: supermarketdb
     ports:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./docker/mysql:/docker-entrypoint-initdb.d:ro
     networks:
       - supermarket-network
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
       timeout: 20s
       retries: 10
 
@@ -33,26 +61,247 @@ services:
       timeout: 3s
       retries: 5
 
-  backend:
-    build: .
-    container_name: supermarket-backend
+  kafka:
+    image: apache/kafka:3.8.1
+    container_name: supermarket-kafka
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+    networks:
+      - supermarket-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: supermarket-zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - supermarket-network
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8761/actuator/health" ]
+
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    environment:
+      CONFIG_REPO_LOCATION: file:/config-repo/
+    volumes:
+      - ./config-repo:/config-repo:ro
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8888/actuator/health" ]
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: authdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: "${JWT_SECRET:-bWktY2xhdmUtc2VjcmV0YS1zdXBlci1zZWd1cmEtcGFyYS1kZXNhcnJvbGxvLTIwMjYteHg=}"
+      JWT_EXPIRATION: "${JWT_EXPIRATION:-86400000}"
     depends_on:
+      <<: *platform-dependencies
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: supermarketdb
-      MYSQL_USERNAME: root
-      MYSQL_PASSWORD: "${DB_PASSWORD:-123456}"
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-    ports:
-      - "8080:8080"
     networks:
       - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8081/actuator/health" ]
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: catalog-service/Dockerfile
+    container_name: catalog-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: catalogdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      <<: *platform-dependencies
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8082/actuator/health" ]
+
+  branch-service:
+    build:
+      context: .
+      dockerfile: branch-service/Dockerfile
+    container_name: branch-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: branchdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      <<: *platform-dependencies
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8083/actuator/health" ]
+
+  sales-service:
+    build:
+      context: .
+      dockerfile: sales-service/Dockerfile
+    container_name: sales-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: salesdb
+    depends_on:
+      <<: *platform-dependencies
+      mysql:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8084/actuator/health" ]
+
+  transfer-service:
+    build:
+      context: .
+      dockerfile: transfer-service/Dockerfile
+    container_name: transfer-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: transferdb
+    depends_on:
+      <<: *platform-dependencies
+      mysql:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8085/actuator/health" ]
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: notificationdb
+    depends_on:
+      <<: *platform-dependencies
+      mysql:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8086/actuator/health" ]
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: audit-service/Dockerfile
+    container_name: audit-service
+    environment:
+      <<: [*platform-env, *mysql-env]
+      MYSQL_DATABASE: auditdb
+    depends_on:
+      <<: *platform-dependencies
+      mysql:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8087/actuator/health" ]
+
+  report-service:
+    build:
+      context: .
+      dockerfile: report-service/Dockerfile
+    container_name: report-service
+    environment:
+      <<: [*platform-env]
+    depends_on:
+      <<: *platform-dependencies
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8088/actuator/health" ]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    environment:
+      <<: *platform-env
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:3000}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - supermarket-network
+    healthcheck:
+      <<: *spring-healthcheck
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8080/actuator/health" ]
 
 volumes:
   mysql_data:
