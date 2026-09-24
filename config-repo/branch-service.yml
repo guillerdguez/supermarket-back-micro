@@ -1,0 +1,3 @@
+branch:
+  cache:
+    low-stock-ttl: PT30S
