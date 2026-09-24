@@ -1,0 +1,63 @@
+package com.supermarket.branchservice.mapper;
+
+import com.supermarket.branchservice.dto.branch.BranchRequest;
+import com.supermarket.branchservice.dto.branch.BranchResponse;
+import com.supermarket.branchservice.model.branch.Branch;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class BranchMapper {
+
+    public BranchResponse toResponse(Branch branch) {
+        if (branch == null)
+            return null;
+
+        return BranchResponse.builder()
+                .id(branch.getId())
+                .name(branch.getName())
+                .address(branch.getAddress())
+                .isWarehouse(branch.getIsWarehouse())
+                .active(branch.getActive())
+                .build();
+    }
+
+    public Branch toEntity(BranchRequest request) {
+        if (request == null)
+            return null;
+
+        return Branch.builder()
+                .name(request.getName())
+                .address(request.getAddress())
+                .isWarehouse(request.getIsWarehouse() != null
+                        ? request.getIsWarehouse() : false)
+                .build();
+    }
+
+    public void updateEntity(BranchRequest request, Branch target) {
+        if (request == null || target == null)
+            return;
+
+        if (request.getName() != null) {
+            target.setName(request.getName());
+        }
+
+        if (request.getAddress() != null) {
+            target.setAddress(request.getAddress());
+        }
+        if (request.getIsWarehouse() != null) {
+            target.setIsWarehouse(request.getIsWarehouse());
+        }
+
+    }
+
+    public List<BranchResponse> toResponseList(List<Branch> branches) {
+        if (branches == null)
+            return null;
+
+        return branches.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+}
