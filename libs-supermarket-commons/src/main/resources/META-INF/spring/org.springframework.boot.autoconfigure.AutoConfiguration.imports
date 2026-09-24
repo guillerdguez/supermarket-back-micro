@@ -1,0 +1,5 @@
+com.supermarket.commons.web.CommonsWebAutoConfiguration
+com.supermarket.commons.security.CommonsSecurityAutoConfiguration
+com.supermarket.commons.feign.CommonsFeignAutoConfiguration
+com.supermarket.commons.openapi.CommonsOpenApiAutoConfiguration
+com.supermarket.commons.kafka.CommonsKafkaAutoConfiguration
