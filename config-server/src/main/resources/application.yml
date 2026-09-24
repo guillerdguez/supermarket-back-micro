@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: ${CONFIG_BACKEND:native}
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: ${CONFIG_REPO_LOCATION:file:../config-repo/}
+        git:
+          uri: ${CONFIG_GIT_URI:}
+          default-label: ${CONFIG_GIT_LABEL:main}
+          search-paths: config-repo
+
+server:
+  port: ${PORT:8888}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
