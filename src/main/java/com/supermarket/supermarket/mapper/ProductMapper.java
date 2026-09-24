@@ -1,0 +1,45 @@
+package com.supermarket.supermarket.mapper;
+
+import com.supermarket.supermarket.dto.product.ProductRequest;
+import com.supermarket.supermarket.dto.product.ProductResponse;
+import com.supermarket.supermarket.model.product.Product;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class ProductMapper {
+    public ProductResponse toResponse(Product product) {
+        if (product == null) return null;
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .barcode(product.getBarcode())
+                .category(product.getCategory())
+                .price(product.getPrice())
+                .build();
+    }
+
+    public Product toEntity(ProductRequest request) {
+        if (request == null) return null;
+        return Product.builder()
+                .name(request.getName())
+                .barcode(request.getBarcode())
+                .category(request.getCategory())
+                .price(request.getPrice())
+                .build();
+    }
+
+    public void updateEntity(ProductRequest request, Product target) {
+        if (request == null || target == null) return;
+        if (request.getName() != null) target.setName(request.getName());
+        if (request.getBarcode() != null) target.setBarcode(request.getBarcode());
+        if (request.getCategory() != null) target.setCategory(request.getCategory());
+        if (request.getPrice() != null) target.setPrice(request.getPrice());
+    }
+
+    public List<ProductResponse> toResponseList(List<Product> entities) {
+        if (entities == null) return null;
+        return entities.stream().map(this::toResponse).toList();
+    }
+}

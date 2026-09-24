@@ -1,0 +1,98 @@
+package com.supermarket.supermarket.service.business.impl;
+
+import com.supermarket.supermarket.dto.product.ProductRequest;
+import com.supermarket.supermarket.dto.product.ProductResponse;
+import com.supermarket.supermarket.exception.DuplicateResourceException;
+import com.supermarket.supermarket.exception.InvalidOperationException;
+import com.supermarket.supermarket.exception.ResourceNotFoundException;
+import com.supermarket.supermarket.mapper.ProductMapper;
+import com.supermarket.supermarket.model.product.Product;
+import com.supermarket.supermarket.repository.ProductRepository;
+import com.supermarket.supermarket.repository.SaleRepository;
+import com.supermarket.supermarket.service.business.InventoryService;
+import com.supermarket.supermarket.service.business.ProductService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class ProductServiceImpl implements ProductService {
+
+    private final ProductRepository productRepo;
+    private final ProductMapper productMapper;
+    private final SaleRepository saleRepo;
+    private final InventoryService inventoryService;
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<ProductResponse> getAll(Specification<Product> spec) {
+        log.info("Fetching products");
+        return productMapper.toResponseList(productRepo.findAll(spec, Sort.by("name")));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public ProductResponse getById(Long id) {
+        log.info("Fetching product with ID: {}", id);
+        return productMapper.toResponse(findProduct(id));
+    }
+
+    @Override
+    public ProductResponse create(ProductRequest request) {
+        log.info("Creating new product: {}", request.getName());
+        if (productRepo.existsByName(request.getName())) {
+            throw new DuplicateResourceException("Product already exists with name: " + request.getName());
+        }
+        if (StringUtils.hasText(request.getBarcode()) && productRepo.existsByBarcode(request.getBarcode())) {
+            throw new DuplicateResourceException("Product already exists with barcode: " + request.getBarcode());
+        }
+        Product product = productMapper.toEntity(request);
+        Product saved = productRepo.save(product);
+        inventoryService.initializeInventoryForNewProduct(saved);
+        return productMapper.toResponse(saved);
+    }
+
+    @Override
+    public ProductResponse update(Long id, ProductRequest request) {
+        log.info("Updating product with ID: {}", id);
+        Product product = findProduct(id);
+        if (request.getName() != null && !request.getName().equals(product.getName())) {
+            if (productRepo.existsByName(request.getName())) {
+                throw new DuplicateResourceException("Product name already in use: " + request.getName());
+            }
+        }
+        if (StringUtils.hasText(request.getBarcode()) && !request.getBarcode().equals(product.getBarcode())) {
+            if (productRepo.existsByBarcode(request.getBarcode())) {
+                throw new DuplicateResourceException("Product barcode already in use: " + request.getBarcode());
+            }
+        }
+        productMapper.updateEntity(request, product);
+        return productMapper.toResponse(productRepo.save(product));
+    }
+
+    @Override
+    public void delete(Long id) {
+        log.info("Attempting to delete product with ID: {}", id);
+        Product product = findProduct(id);
+        if (saleRepo.existsByDetailsProductId(id)) {
+            throw new InvalidOperationException("Cannot delete product: It has associated sales records");
+        }
+        productRepo.delete(product);
+        log.info("Product deleted successfully - ID: {}", id);
+    }
+
+    private Product findProduct(Long id) {
+        return productRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+    }
+
+}
