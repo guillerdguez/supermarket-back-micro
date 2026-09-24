@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: transfer-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  cloud:
+    loadbalancer:
+      retry:
+        enabled: false
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/${MYSQL_DATABASE:transferdb}?createDatabaseIfNotExist=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:123456}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        default_batch_fetch_size: 20
+  sql:
+    init:
+      mode: ${SQL_INIT_MODE:always}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        max.block.ms: 3000
+        spring.json.type.mapping: transferEvent:com.supermarket.transferservice.event.TransferEvent
+    template:
+      observation-enabled: true
+
+server:
+  port: ${PORT:8085}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - com.supermarket.commons.exception.RemoteServiceException
+          - feign.RetryableException
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException
+          - com.supermarket.commons.exception.RemoteServiceException
+        ignore-exceptions:
+          - com.supermarket.commons.exception.CircuitOpenException
