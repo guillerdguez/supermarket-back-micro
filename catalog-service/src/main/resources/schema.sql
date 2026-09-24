@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS product (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    barcode VARCHAR(50) UNIQUE,
+    category VARCHAR(50),
+    price DECIMAL(19, 2),
+    version BIGINT
+);
