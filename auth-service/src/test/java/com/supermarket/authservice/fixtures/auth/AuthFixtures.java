@@ -1,0 +1,68 @@
+package com.supermarket.authservice.fixtures.auth;
+
+import com.supermarket.authservice.dto.auth.AuthResponse;
+import com.supermarket.authservice.dto.auth.LoginRequest;
+import com.supermarket.authservice.dto.auth.UserResponse;
+import com.supermarket.authservice.dto.user.UserRequest;
+import com.supermarket.authservice.model.user.UserRole;
+import lombok.experimental.UtilityClass;
+
+@UtilityClass
+public class AuthFixtures {
+    public static UserRequest userRegisterRequest() {
+        return UserRequest.builder()
+                .username("test-user")
+                .email("user@test.com")
+                .password("Password123!")
+                .firstName("Test")
+                .lastName("User")
+                .role(UserRole.CASHIER)
+                .build();
+    }
+
+    public static UserRequest adminRegisterRequest() {
+        return UserRequest.builder()
+                .username("admin-test")
+                .email("admin@test.com")
+                .password("Admin123!")
+                .firstName("Admin")
+                .lastName("Test")
+                .role(UserRole.ADMIN)
+                .build();
+    }
+
+    public static UserRequest cashierRegisterRequest() {
+        return UserRequest.builder()
+                .username("cashier-test")
+                .email("cashier@test.com")
+                .password("Cashier123!")
+                .firstName("Cashier")
+                .lastName("Test")
+                .role(UserRole.CASHIER)
+                .build();
+    }
+
+    public static LoginRequest validLoginRequest() {
+        return LoginRequest.builder()
+                .email("user@test.com")
+                .password("Password123!")
+                .build();
+    }
+
+    public static AuthResponse authResponse() {
+        return AuthResponse.builder()
+                .token("jwt-token-value")
+                .user(UserResponse.builder()
+                        .id(1L)
+                        .username("test-user")
+                        .email("user@test.com")
+                        .firstName("Test")
+                        .lastName("User")
+                        .role(UserRole.CASHIER.name())
+                        .active(true)
+                        .branchId(1L)
+                        .branchName("Central Warehouse")
+                        .build())
+                .build();
+    }
+}

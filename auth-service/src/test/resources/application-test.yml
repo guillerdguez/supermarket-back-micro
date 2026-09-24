@@ -1,0 +1,36 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+  config:
+    import: ""
+  datasource:
+    url: jdbc:h2:mem:authdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  sql:
+    init:
+      mode: never
+  kafka:
+    admin:
+      auto-create: false
+    listener:
+      auto-startup: false
+
+eureka:
+  client:
+    enabled: false
+
+management:
+  tracing:
+    enabled: false
+
+jwt:
+  secret: bXlUZXN0U2VjcmV0S2V5Rm9ySnd0SFMyNTZTaWduYXR1cmU=
+  expiration: 86400000

@@ -1,0 +1,20 @@
+package com.supermarket.authservice.dto.auth;
+
+import lombok.*;
+
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserResponse {
+    private Long id;
+    private String username;
+    private String email;
+    private String firstName;
+    private String lastName;
+    private String role;
+    private Boolean active;
+    private Long branchId;
+    private String branchName;
+}
