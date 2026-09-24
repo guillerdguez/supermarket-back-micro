@@ -1,0 +1,16 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+  config:
+    import: ""
+
+eureka:
+  client:
+    enabled: false
+
+management:
+  tracing:
+    enabled: false

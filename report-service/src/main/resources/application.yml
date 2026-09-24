@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: report-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  cloud:
+    loadbalancer:
+      retry:
+        enabled: false
+
+server:
+  port: ${PORT:8088}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - com.supermarket.commons.exception.RemoteServiceException
+          - feign.RetryableException
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException
+          - com.supermarket.commons.exception.RemoteServiceException
+        ignore-exceptions:
+          - com.supermarket.commons.exception.CircuitOpenException
