@@ -1,0 +1,214 @@
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:3000}
+            allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+            allowed-headers: "*"
+            exposed-headers: Authorization
+            allow-credentials: true
+      routes:
+        - id: auth-public
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+            - name: CircuitBreaker
+              args:
+                name: auth-service
+                fallbackUri: forward:/fallback/auth-service
+        - id: auth-users
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/users/**,/api/profile/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: auth-service
+                fallbackUri: forward:/fallback/auth-service
+        - id: catalog
+          uri: lb://catalog-service
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: catalog-service
+                fallbackUri: forward:/fallback/catalog-service
+        - id: branch
+          uri: lb://branch-service
+          predicates:
+            - Path=/api/branches/**,/api/inventory/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: branch-service
+                fallbackUri: forward:/fallback/branch-service
+        - id: sales
+          uri: lb://sales-service
+          predicates:
+            - Path=/api/sales/**,/api/cashier/**,/api/cash-registers/**,/api/payments/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: sales-service
+                fallbackUri: forward:/fallback/sales-service
+        - id: transfer
+          uri: lb://transfer-service
+          predicates:
+            - Path=/api/transfers/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: transfer-service
+                fallbackUri: forward:/fallback/transfer-service
+        - id: notification
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: notification-service
+                fallbackUri: forward:/fallback/notification-service
+        - id: audit
+          uri: lb://audit-service
+          predicates:
+            - Path=/api/audit-logs/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: audit-service
+                fallbackUri: forward:/fallback/audit-service
+        - id: report
+          uri: lb://report-service
+          predicates:
+            - Path=/api/reports/**
+          filters:
+            - StripPrefix=1
+            - JwtValidation
+            - name: CircuitBreaker
+              args:
+                name: report-service
+                fallbackUri: forward:/fallback/report-service
+        - id: api-docs-auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api-docs/auth-service
+          filters:
+            - RewritePath=/api-docs/auth-service, /v3/api-docs
+        - id: api-docs-catalog-service
+          uri: lb://catalog-service
+          predicates:
+            - Path=/api-docs/catalog-service
+          filters:
+            - RewritePath=/api-docs/catalog-service, /v3/api-docs
+        - id: api-docs-branch-service
+          uri: lb://branch-service
+          predicates:
+            - Path=/api-docs/branch-service
+          filters:
+            - RewritePath=/api-docs/branch-service, /v3/api-docs
+        - id: api-docs-sales-service
+          uri: lb://sales-service
+          predicates:
+            - Path=/api-docs/sales-service
+          filters:
+            - RewritePath=/api-docs/sales-service, /v3/api-docs
+        - id: api-docs-transfer-service
+          uri: lb://transfer-service
+          predicates:
+            - Path=/api-docs/transfer-service
+          filters:
+            - RewritePath=/api-docs/transfer-service, /v3/api-docs
+        - id: api-docs-notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api-docs/notification-service
+          filters:
+            - RewritePath=/api-docs/notification-service, /v3/api-docs
+        - id: api-docs-audit-service
+          uri: lb://audit-service
+          predicates:
+            - Path=/api-docs/audit-service
+          filters:
+            - RewritePath=/api-docs/audit-service, /v3/api-docs
+        - id: api-docs-report-service
+          uri: lb://report-service
+          predicates:
+            - Path=/api-docs/report-service
+          filters:
+            - RewritePath=/api-docs/report-service, /v3/api-docs
+
+server:
+  port: ${PORT:8080}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://auth-service}
+    timeout: 3s
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 15s
+
+springdoc:
+  api-docs:
+    path: /api/v3/api-docs
+  swagger-ui:
+    path: /api/swagger-ui.html
+    urls:
+      - name: auth-service
+        url: /api-docs/auth-service
+      - name: catalog-service
+        url: /api-docs/catalog-service
+      - name: branch-service
+        url: /api-docs/branch-service
+      - name: sales-service
+        url: /api-docs/sales-service
+      - name: transfer-service
+        url: /api-docs/transfer-service
+      - name: notification-service
+        url: /api-docs/notification-service
+      - name: audit-service
+        url: /api-docs/audit-service
+      - name: report-service
+        url: /api-docs/report-service
